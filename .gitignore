@@ -1,0 +1,16 @@
+# 构建产物
+bin/
+obj/
+out/
+
+# 程序运行时数据（配置、进度、书签、加载日志）
+# 只能限定在仓库根目录：写成 data/ 会连 src/DReaderNext/Data/ 这个源码目录一起忽略掉
+# （Windows 上 git 不区分大小写，Data 与 data 会被同一条规则命中）
+/data/
+
+# 本地留档，不入库（实现记录、调研脚本、验证器、本地探测、旧历史备份）
+/docs/
+/p0/
+/tools/
+/.probe/
+/.git.old/

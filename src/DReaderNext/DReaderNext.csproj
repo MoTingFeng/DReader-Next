@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DReaderNext</RootNamespace>
+    <AssemblyName>DReaderNext</AssemblyName>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Version>0.1.0</Version>
+    <!-- 高 DPI：PerMonitorV2，避免缩放下发虚（对应验收项 9） -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationDefaultFont>宋体, 12pt</ApplicationDefaultFont>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!-- 低内存取向：GC 保守模式（.NET 8+ 专为低内存场景设计，减少 GC 段的保留）
+         + 关掉后台并发 GC（省掉后台 GC 线程及其堆）。
+         阅读器每页只分配几 KB，GC 变频繁的代价几乎为零。 -->
+    <GCConserveMemory>9</GCConserveMemory>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+</Project>
