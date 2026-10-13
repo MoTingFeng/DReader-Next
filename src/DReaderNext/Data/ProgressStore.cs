@@ -1,3 +1,5 @@
+using DReaderNext.Core;
+
 namespace DReaderNext.Data;
 
 /// <summary>一本书的阅读位置。</summary>
@@ -43,22 +45,8 @@ public sealed class ProgressStore
 
         pos.Line = line;
         pos.TotalLines = totalLines;
-        pos.Percent = totalLines > 0 ? Math.Clamp(line * 100.0 / totalLines, 0, 100) : 0;
+        pos.Percent = totalLines > 0 ? Compat.Clamp(line * 100.0 / totalLines, 0, 100) : 0;
         pos.LastRead = DateTime.Now;
-    }
-
-    /// <summary>合并旧 Bookmark.lst 导入的记录：已存在的不覆盖，缺的补上。返回新增条数。</summary>
-    public int MergeLegacy(IEnumerable<ReadingPosition> legacy)
-    {
-        int added = 0;
-        foreach (ReadingPosition item in legacy)
-        {
-            if (item.Path.Length == 0 || Find(item.Path) is not null)
-                continue;
-            Books.Add(item);
-            added++;
-        }
-        return added;
     }
 
     private ReadingPosition Add(string bookPath)

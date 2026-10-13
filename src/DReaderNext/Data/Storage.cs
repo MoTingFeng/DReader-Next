@@ -1,21 +1,14 @@
-using System.Text.Encodings.Web;
-using System.Text.Json;
+using System.Text;
 
 namespace DReaderNext.Data;
 
 /// <summary>
 /// 数据目录与 JSON 读写。
 /// 绿色优先：先试 exe 旁的 data\，确实写不进去（例如 exe 放在 Program Files）才回退 %APPDATA%。
+/// JSON 由 MiniJson 读写（net48 无可用 JSON 序列化器，见 MiniJson 的说明）。
 /// </summary>
 public static class Storage
 {
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        WriteIndented = true,
-        // 中文不转义成 \uXXXX，配置文件保持可读、可手改
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
-
     public static string DataDir { get; } = ResolveDataDir();
 
     private static string ResolveDataDir()
@@ -47,7 +40,7 @@ public static class Storage
 
         try
         {
-            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), JsonOpts);
+            return MiniJson.Parse(File.ReadAllText(path), typeof(T)) as T;
         }
         catch (Exception)
         {
@@ -59,6 +52,8 @@ public static class Storage
     public static void SaveJson<T>(string fileName, T value) where T : class
     {
         string path = Path.Combine(DataDir, fileName);
-        File.WriteAllText(path, JsonSerializer.Serialize(value, JsonOpts));
+        // 无 BOM 的 UTF-8：中文直接可见，配置文件可手改
+        File.WriteAllText(path, MiniJson.Write(value),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 }

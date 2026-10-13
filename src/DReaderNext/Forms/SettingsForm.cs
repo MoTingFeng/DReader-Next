@@ -1,3 +1,4 @@
+using DReaderNext.Core;
 using DReaderNext.Data;
 
 namespace DReaderNext.Forms;
@@ -49,6 +50,8 @@ public sealed class SettingsForm : Form
         _back = Parse(settings.BackColor, Color.FromArgb(0xE8, 0xEC, 0xEC));
 
         Text = "设置";
+        // net48 没有 ApplicationDefaultFont（.NET 6+ 源生成器），原默认字体「宋体 12pt」在此补回
+        Font = new Font("宋体", 12f);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
@@ -159,7 +162,7 @@ public sealed class SettingsForm : Form
     private void LoadValues()
     {
         _fontName.Text = _settings.FontName;
-        _fontSize.Value = Math.Clamp((decimal)_settings.FontSize, _fontSize.Minimum, _fontSize.Maximum);
+        _fontSize.Value = Compat.Clamp((decimal)_settings.FontSize, _fontSize.Minimum, _fontSize.Maximum);
         UpdateColorButtons();
 
         SetHotkeyRow(0, _settings.KeyPrev);
@@ -218,7 +221,7 @@ public sealed class SettingsForm : Form
         var defaults = new AppSettings();
 
         _fontName.Text = defaults.FontName;
-        _fontSize.Value = Math.Clamp((decimal)defaults.FontSize, _fontSize.Minimum, _fontSize.Maximum);
+        _fontSize.Value = Compat.Clamp((decimal)defaults.FontSize, _fontSize.Minimum, _fontSize.Maximum);
         _fore = Parse(defaults.FontColor, Color.FromArgb(0xEC, 0xEC, 0xEC));
         _back = Parse(defaults.BackColor, Color.FromArgb(0xE8, 0xEC, 0xEC));
         UpdateColorButtons();
@@ -267,8 +270,13 @@ public sealed class SettingsForm : Form
         var modifiers = new List<string>();
         string key = string.Empty;
 
-        foreach (string part in spec.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (string raw in spec.Split('+'))
         {
+            // net48 没有 StringSplitOptions.TrimEntries（.NET 5+），自己修剪并跳过空段
+            string part = raw.Trim();
+            if (part.Length == 0)
+                continue;
+
             switch (part.ToLowerInvariant())
             {
                 case "ctrl" or "control": modifiers.Add("Ctrl"); break;

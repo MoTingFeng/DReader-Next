@@ -2,7 +2,7 @@
 
 一个精简的 Windows 桌面小说阅读器：**无边框透明悬浮窗 + 老板键**。
 
-用 C# / .NET 10 WinForms 重写自 DReader 7.3.0.0（易语言静态编译，作者 Dim，最后更新 2022-03）。
+用 C# / .NET Framework 4.8.1 WinForms 重写自 DReader 7.3.0.0（易语言静态编译，作者 Dim，最后更新 2022-03）。
 原程序已失去维护——静态编译没有源码、无法重新编译，只能重写。
 
 ---
@@ -30,20 +30,20 @@
 
 - 设置面板：字体 / 字号 / 字体颜色 / 自定义底色 / 热键自定义 / 重置
 - 自动翻页、跳转页面、比率跳转
-- 首次启动可从旧版 DReader 迁移设置与 27 条阅读进度（`Ebook.ini` / `Bookmark.lst`）
 
 ---
 
 ## 运行
 
-需要 **.NET 10 桌面运行时**（Windows 10 1809+ / Windows 11 x64）。
+需要 **.NET Framework 4.8.1**——Win10 21H2+ / Win11 **系统自带，不用装任何运行时**。
+下载 exe 双击即用；配置与进度写在 exe 旁的 `data\`（写不进去时回退 `%APPDATA%\DReaderNext`）。
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained false /p:PublishSingleFile=true
+dotnet publish src/DReaderNext/DReaderNext.csproj -c Release -o out/publish
 ```
 
-产物约 **230 KB**（framework-dependent 单文件），位于
-`src\DReaderNext\bin\Release\net10.0-windows\win-x64\publish\`。
+产物**只有一个 exe，约 76 KB**（另有 174 B 的 `DReaderNext.exe.config`，必须与 exe 放在一起）。
+net48 不支持单文件发布，但零第三方依赖，所以 exe 本身就是完整的程序。
 
 ---
 
@@ -71,7 +71,7 @@ dotnet publish -c Release -r win-x64 --self-contained false /p:PublishSingleFile
 ```
 src/DReaderNext/
   Core/      TextLoader（流式扫描 + 编码判定）、ChapterParser、Book（偏移索引 + 按需读取）
-  Data/      配置、进度、书签的持久化；旧版数据迁移
+  Data/      配置、进度、书签的持久化（自写极简 JSON 读写，见下）
   Forms/     主窗口、目录、书签、设置、输入框
   Interop/   Win32 调用（全局热键）
 ```
@@ -88,13 +88,20 @@ src/DReaderNext/
 
 **窗口宽高按逻辑像素存，显示时乘 DPI 因子。** 原程序是 DPI 不感知的，200% 缩放下由系统替它放大；
 本程序声明了 PerMonitorV2，必须自己换算，否则窗口视觉上只有原来一半大。
+net48 上这件事要**两个地方都声明**：`app.manifest` 写 `dpiAwareness`，**并且** `App.config` 里要有
+`System.Windows.Forms.ApplicationConfigurationSection/DpiAwareness=PerMonitorV2`——只写 manifest 的话
+WinForms 会把 `DeviceDpi` 一直当 96，窗口就真的只剩一半大（已实测踩过）。
 
 **配色带对比度保护。** 原程序的浅灰字（`#ECECEC`）配浅灰底（`#E8ECEC`）是为「半透明浮在深色桌面」
 设计的，用在普通不透明窗口上亮度差只有 0.003、等于隐形；不透明模式会自动换深色字。
 
-**不迁移旧热键。** 原配置里 `功能键=4` 的常量含义已无从考证，盲目沿用会把键绑错。
+**零第三方依赖。** GB18030 由 .NET Framework 自带（不需要 `CodePagesEncodingProvider`），
+整个项目不需要任何 NuGet 包，发布产物就是一个 exe。
 
-**零第三方依赖。** GB18030 由 WindowsDesktop 共享框架自带，整个项目不需要任何 NuGet 包。
+**配置文件自己读写 JSON。** net48 上没有可用的 JSON 序列化器：`System.Text.Json` 是 NuGet 包
+（会多拖 9 个 DLL / 1.16 MB），自带的 `DataContractJsonSerializer` 读不了 ISO 8601 日期，
+`JavaScriptSerializer` 又把日期写成 `\/Date(ms)\/` 且回读丢时区。所以 `Data/MiniJson.cs` 只实现
+本工程需要的形状（对象 / List / 基本类型 / DateTime / null），输出仍是「缩进 + 中文不转义 + ISO 日期」。
 
 ---
 
@@ -102,6 +109,6 @@ src/DReaderNext/
 
 - **不支持 EPUB**（原程序支持，本重写版未做）
 - **不含自动更新 / 检查更新**（原更新地址早已失效）
-- 内存约 **20–26 MB**（任务管理器口径），其中约 13 MB 是 .NET 运行时与 WinForms 程序集的
-  平台成本，不是书的开销；加载 3.4 MB 的书只额外增加几 MB
+- **不迁移原程序的配置与历史记录**（`Ebook.ini` / `Bookmark.lst` 一律不读）
+- 内存（3.4 MB 真书）：私有工作集约 **19 MB**，总工作集约 **68 MB**；空闲 CPU 0.00%
 

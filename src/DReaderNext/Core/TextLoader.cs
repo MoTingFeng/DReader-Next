@@ -39,9 +39,7 @@ public static class TextLoader
 
     static TextLoader()
     {
-        // .NET 不自带 GB18030，必须先注册代码页编码器（由 WindowsDesktop 共享框架提供）
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
+        // .NET Framework 自带 GB18030 等代码页编码，不需要注册 CodePagesEncodingProvider
         StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
         StrictGb18030 = Encoding.GetEncoding("GB18030",
             EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
@@ -146,7 +144,7 @@ public static class TextLoader
 
     private static TextScanResult Build(ScanState state, Encoding encoding, string name, long length)
     {
-        if (state.Offsets.Count == 0 || state.Offsets[^1] < length)
+        if (state.Offsets.Count == 0 || state.Offsets[state.Offsets.Count - 1] < length)
             state.Offsets.Add(length);
 
         // 主力规则几乎没命中时才退而采用「含数字序号」的那一套
@@ -250,7 +248,7 @@ public static class TextLoader
                 // \r\n 的第二半：这一行已在 \r 处收尾，只需把下一行起点推过 \n
                 if (isLf && lastWasCr)
                 {
-                    state.Offsets[^1] = position + i + unit;
+                    state.Offsets[state.Offsets.Count - 1] = position + i + unit;
                     lastWasCr = false;
                     continue;
                 }

@@ -41,12 +41,12 @@ public sealed class Book
         Math.Max(1, (int)Math.Ceiling(LineCount / (double)Math.Max(1, RowsPerPage)));
 
     public int LineToPage(int line) =>
-        Math.Clamp(line / Math.Max(1, RowsPerPage), 0, TotalPages - 1);
+        Compat.Clamp(line / Math.Max(1, RowsPerPage), 0, TotalPages - 1);
 
     /// <summary>取某页对应的行区间 [start, start+count)。</summary>
     public (int Start, int Count) PageRange(int page)
     {
-        int start = Math.Clamp(page, 0, TotalPages - 1) * RowsPerPage;
+        int start = Compat.Clamp(page, 0, TotalPages - 1) * RowsPerPage;
         return (start, Math.Max(0, Math.Min(RowsPerPage, LineCount - start)));
     }
 
@@ -72,7 +72,7 @@ public sealed class Book
         if (count <= 0 || LineCount == 0)
             return string.Empty;
 
-        int start = Math.Clamp(startLine, 0, LineCount - 1);
+        int start = Compat.Clamp(startLine, 0, LineCount - 1);
         int end = Math.Min(start + count, LineCount);
 
         long from = _lineOffsets[start];

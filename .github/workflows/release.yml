@@ -29,29 +29,20 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: 构建 · 精简版（需 .NET 10 桌面运行时）
-        run: >
-          dotnet publish src/DReaderNext/DReaderNext.csproj
-          -c Release -r win-x64 --self-contained false
-          /p:PublishSingleFile=true
-          -o out/lite
-
-      - name: 构建 · 免安装版（自带运行时）
-        run: >
-          dotnet publish src/DReaderNext/DReaderNext.csproj
-          -c Release -r win-x64 --self-contained true
-          /p:PublishSingleFile=true
-          /p:EnableCompressionInSingleFile=true
-          -o out/standalone
+      # net48 由 SDK 编译；本机/CI 都不需要 Developer Pack（csproj 里指向框架目录）
+      - name: 构建
+        run: dotnet publish src/DReaderNext/DReaderNext.csproj -c Release -o out/publish
 
       - name: 整理产物
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path out/pkg | Out-Null
-          Copy-Item out/lite/DReaderNext.exe       out/pkg/DReaderNext-lite.exe
-          Copy-Item out/standalone/DReaderNext.exe out/pkg/DReaderNext-standalone.exe
+          # exe 必须与同名的 .exe.config 放在一起：DPI（PerMonitorV2）声明就在里面
+          Copy-Item out/publish/DReaderNext.exe        out/pkg/DReaderNext.exe
+          Copy-Item out/publish/DReaderNext.exe.config out/pkg/DReaderNext.exe.config
           Compress-Archive -Path out/pkg/* -DestinationPath out/DReaderNext.zip -Force
-          Get-ChildItem out/pkg | ForEach-Object { "{0,-30} {1,12:N0} B" -f $_.Name, $_.Length }
+          Get-ChildItem out/pkg | ForEach-Object { "{0,-24} {1,10:N0} B" -f $_.Name, $_.Length }
+          "压缩包 {0:N0} B" -f (Get-Item out/DReaderNext.zip).Length
 
       - name: 发布 Release
         shell: pwsh
@@ -59,15 +50,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = $env:TAG
-          $notes = "两个文件功能完全相同，区别只在运行时怎么打包。`n`n" +
-                   "- **DReaderNext-standalone.exe**（约 47 MB）：什么都不用装，双击即用 —— 首次使用建议选这个`n" +
-                   "- **DReaderNext-lite.exe**（约 230 KB）：需先安装 .NET 10 桌面运行时`n" +
-                   "- **DReaderNext.zip**：上述两个文件的压缩包`n`n" +
+          $notes = "免安装：下载 zip 解压后双击 DReaderNext.exe 即可，不需要任何运行时（Win10 21H2+ / Win11 自带 .NET Framework 4.8.1）。`n`n" +
+                   "- **DReaderNext.zip**（约 80 KB）：`DReaderNext.exe` + `DReaderNext.exe.config`，**两个文件必须放在一起**`n" +
+                   "- **DReaderNext.exe**（约 76 KB）：单独取用的话记得同时保留配套的 `.exe.config`，否则高 DPI 缩放会不对`n`n" +
                    "操作方式见仓库 README：窗口无边框且背景透明，右键菜单是主要入口，老板键默认 Alt+3。"
+          $files = @('out/DReaderNext.zip', 'out/pkg/DReaderNext.exe', 'out/pkg/DReaderNext.exe.config')
 
           gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag out/DReaderNext.zip out/pkg/DReaderNext-lite.exe out/pkg/DReaderNext-standalone.exe --clobber --repo $env:GITHUB_REPOSITORY
+            gh release upload $tag @files --clobber --repo $env:GITHUB_REPOSITORY
           } else {
-            gh release create $tag out/DReaderNext.zip out/pkg/DReaderNext-lite.exe out/pkg/DReaderNext-standalone.exe --repo $env:GITHUB_REPOSITORY --title "DReader-Next $tag" --notes $notes
+            gh release create $tag @files --repo $env:GITHUB_REPOSITORY --title "DReader-Next $tag" --notes $notes
           }

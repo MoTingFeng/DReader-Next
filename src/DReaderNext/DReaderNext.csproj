@@ -2,7 +2,10 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- net48：Win10 21H2+/Win11 预装运行时，免安装、无运行时打包（对应发布体积目标） -->
+    <TargetFramework>net48</TargetFramework>
+    <!-- 关键：用最新语言版本编译 net48，文件作用域 namespace / target-typed new / record 等语法原样保留 -->
+    <LangVersion>latest</LangVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,16 +14,15 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <Version>0.1.0</Version>
-    <!-- 高 DPI：PerMonitorV2，避免缩放下发虚（对应验收项 9） -->
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <ApplicationDefaultFont>宋体, 12pt</ApplicationDefaultFont>
+    <!-- 高 DPI：net48 没有 ApplicationHighDpiMode 源生成器，改由 manifest 声明 PerMonitorV2（对应验收项 9） -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
 
-    <!-- 低内存取向：GC 保守模式（.NET 8+ 专为低内存场景设计，减少 GC 段的保留）
-         + 关掉后台并发 GC（省掉后台 GC 线程及其堆）。
-         阅读器每页只分配几 KB，GC 变频繁的代价几乎为零。 -->
-    <GCConserveMemory>9</GCConserveMemory>
-    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- net48 参考程序集：本机没装 Developer Pack，直接指向框架目录编译（等价于
+         Microsoft.NETFramework.ReferenceAssemblies 包做的事）。同时关掉 SDK 自动引入的
+         同名包——它需要联网还原，而本机 dotnet 访问不到 nuget.org。 -->
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride Condition="'$(FrameworkPathOverride)' == '' and Exists('C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorlib.dll')">C:\Windows\Microsoft.NET\Framework64\v4.0.30319</FrameworkPathOverride>
   </PropertyGroup>
 
 </Project>

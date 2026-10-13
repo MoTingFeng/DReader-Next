@@ -119,12 +119,14 @@ public sealed class MainForm : Form
         _settings = AppSettings.Load();
         _progress = ProgressStore.Load();
 
+        // net48 没有 ApplicationDefaultFont（.NET 6+ 源生成器），原默认字体「宋体 12pt」在此补回；
+        // 必须在建控件之前设，子控件才能继承到。
+        Font = new Font("宋体", 12f);
+
         BuildUi();
         BuildContextMenu();
         BuildTray();
         ApplySettings();
-
-        TryImportLegacy();
 
         AllowDrop = true;
         KeyPreview = true;
@@ -390,7 +392,7 @@ public sealed class MainForm : Form
     private void ApplyAppearance()
     {
         TopMost = _settings.AlwaysOnTop;
-        Opacity = Math.Clamp(_settings.WindowOpacity, 0.2, 1.0);
+        Opacity = Compat.Clamp(_settings.WindowOpacity, 0.2, 1.0);
 
         Color key = ParseColor(_settings.BackColor, Color.FromArgb(0xE8, 0xEC, 0xEC));
 
@@ -433,7 +435,7 @@ public sealed class MainForm : Form
 
     private void SetOpacity(double value)
     {
-        _settings.WindowOpacity = Math.Clamp(value, 0.2, 1.0);
+        _settings.WindowOpacity = Compat.Clamp(value, 0.2, 1.0);
         ApplyAppearance();
         _settings.Save();
     }
@@ -717,8 +719,13 @@ public sealed class MainForm : Form
         uint modifiers = 0;
         uint vk = 0;
 
-        foreach (string part in spec.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (string raw in spec.Split('+'))
         {
+            // net48 没有 StringSplitOptions.TrimEntries（.NET 5+），自己修剪并跳过空段
+            string part = raw.Trim();
+            if (part.Length == 0)
+                continue;
+
             switch (part.ToLowerInvariant())
             {
                 case "alt": modifiers |= (uint)NativeMethods.HotkeyModifiers.Alt; break;
@@ -946,7 +953,7 @@ public sealed class MainForm : Form
             return pos.Line;
 
         if (pos.Percent > 0 && book.LineCount > 0)
-            return Math.Clamp((int)(book.LineCount * pos.Percent / 100.0), 0, book.LineCount - 1);
+            return Compat.Clamp((int)(book.LineCount * pos.Percent / 100.0), 0, book.LineCount - 1);
 
         return 0;
     }
@@ -1078,7 +1085,7 @@ public sealed class MainForm : Form
         int ci = _book.ChapterAtLine(_currentLine);
         string preview = _currentLine < _book.LineCount ? _book.ReadLines(_currentLine, 1).Trim() : string.Empty;
         if (preview.Length > 40)
-            preview = preview[..40];
+            preview = preview.Substring(0, 40);
 
         store.Add(new Bookmark
         {
@@ -1135,7 +1142,7 @@ public sealed class MainForm : Form
         if (_book is null)
             return;
 
-        _currentLine = Math.Clamp(bookmark.Line, 0, Math.Max(0, _book.LineCount - 1));
+        _currentLine = Compat.Clamp(bookmark.Line, 0, Math.Max(0, _book.LineCount - 1));
         RenderPage();
         SaveProgress();
         ShowWindow();
@@ -1192,7 +1199,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        _currentLine = Math.Clamp((int)(_book.LineCount * percent / 100.0), 0,
+        _currentLine = Compat.Clamp((int)(_book.LineCount * percent / 100.0), 0,
             Math.Max(0, _book.LineCount - 1));
         RenderPage();
         SaveProgress();
@@ -1421,34 +1428,6 @@ public sealed class MainForm : Form
     }
 
     // ---------------------------------------------------------------- 旧数据导入
-
-    /// <summary>
-    /// 首次启动（还没有 settings.json）时，检测旧 DReader 的配置与阅读进度并询问是否导入。
-    /// 全程只读旧文件，导入后原文件保持不动。
-    /// </summary>
-    private void TryImportLegacy()
-    {
-        if (File.Exists(Path.Combine(Storage.DataDir, "settings.json")))
-            return;
-        if (!LegacyImporter.HasLegacyFiles())
-            return;
-
-        DialogResult answer = MessageBox.Show(
-            "检测到旧版 DReader 的设置与阅读进度。\n\n是否导入？（只读取，原文件不会被修改）",
-            "DReader-Next", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-        if (answer != DialogResult.Yes)
-            return;
-
-        if (LegacyImporter.ImportSettings(LegacyImporter.DefaultIniPath, _settings))
-            _settings.Save();
-
-        List<ReadingPosition> legacy = LegacyImporter.ImportBookmarks(LegacyImporter.DefaultBookmarkPath);
-        if (_progress.MergeLegacy(legacy) > 0)
-            _progress.Save();
-
-        ApplySettings();
-    }
 
     /// <summary>把本次加载的关键数据落盘，便于验证与排查（不参与阅读逻辑）。</summary>
     private void WriteLoadLog(string path, Book book, long elapsedMs)
