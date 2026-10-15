@@ -12,6 +12,7 @@ internal sealed class InputDialog : Form
         Text = title;
         // net48 没有 ApplicationDefaultFont（.NET 6+ 源生成器），原默认字体「宋体 12pt」在此补回
         Font = new Font("宋体", 12f);
+        Icon = AppIcon.Value;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;

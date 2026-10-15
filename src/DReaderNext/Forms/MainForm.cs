@@ -132,6 +132,7 @@ public sealed class MainForm : Form
         // net48 没有 ApplicationDefaultFont（.NET 6+ 源生成器），原默认字体「宋体 12pt」在此补回；
         // 必须在建控件之前设，子控件才能继承到。
         Font = new Font("宋体", 12f);
+        Icon = AppIcon.Value;
 
         BuildUi();
         BuildContextMenu();
@@ -360,7 +361,7 @@ public sealed class MainForm : Form
 
     private void BuildTray()
     {
-        _tray.Icon = SystemIcons.Application;
+        _tray.Icon = AppIcon.Value;
         _tray.Text = "DReader-Next";
 
         var trayMenu = new ContextMenuStrip();

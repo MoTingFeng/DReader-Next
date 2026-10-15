@@ -51,8 +51,9 @@ jobs:
         run: |
           $tag = $env:TAG
           $notes = "免安装：下载 zip 解压后双击 DReaderNext.exe 即可，不需要任何运行时（Win10 21H2+ / Win11 自带 .NET Framework 4.8.1）。`n`n" +
-                   "- **DReaderNext.zip**（约 80 KB）：`DReaderNext.exe` + `DReaderNext.exe.config`，**两个文件必须放在一起**`n" +
-                   "- **DReaderNext.exe**（约 76 KB）：单独取用的话记得同时保留配套的 `.exe.config`，否则高 DPI 缩放会不对`n`n" +
+                   "- **DReaderNext.zip**：`DReaderNext.exe` + `DReaderNext.exe.config`，**两个文件必须放在一起**`n" +
+                   "- **DReaderNext.exe**：单独取用的话记得同时保留配套的 `.exe.config`（高 DPI 缩放与 DPI 感知声明在里面）`n`n" +
+                   "本版要点：整体运行在 .NET Framework 4.8.1 上，单文件约 0.1 MB；`鼠标穿透` 默认关闭（窗口内任意位置都能拖动、点半区翻页、滚轮翻页、右键出菜单），可在右键菜单里切回穿透。`n`n" +
                    "操作方式见仓库 README：窗口无边框且背景透明，右键菜单是主要入口，老板键默认 Alt+3。"
           $files = @('out/DReaderNext.zip', 'out/pkg/DReaderNext.exe', 'out/pkg/DReaderNext.exe.config')
 

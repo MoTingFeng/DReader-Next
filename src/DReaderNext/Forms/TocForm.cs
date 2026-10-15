@@ -17,6 +17,7 @@ public sealed class TocForm : Form
         Text = "小说目录";
         // net48 没有 ApplicationDefaultFont，补回原默认字体（列表本身用 10pt，见下）
         Font = new Font("宋体", 12f);
+        Icon = AppIcon.Value;
         Width = 440;
         Height = 560;
         StartPosition = FormStartPosition.CenterParent;
