@@ -325,6 +325,7 @@ public sealed class MainForm : Form
         _contextMenu.Items.Add(new ToolStripSeparator());
         _contextMenu.Items.Add("设置(&S)...", null, (_, _) => OpenSettings());
         _contextMenu.Items.Add("关于(&A)...", null, (_, _) => ShowAbout());
+        _contextMenu.Items.Add("导出诊断日志(&L)...", null, (_, _) => ExportDiagnostics());
         _contextMenu.Items.Add("退出(&X)", null, (_, _) => Close());
 
         _contextMenu.Opening += (_, _) => SyncContextMenuChecks(autoHideDelay);
@@ -370,6 +371,7 @@ public sealed class MainForm : Form
         trayMenu.Items.Add("下一页(&N)", null, (_, _) => NextPage());
         trayMenu.Items.Add("小说目录(&C)", null, (_, _) => ShowToc());
         trayMenu.Items.Add(new ToolStripSeparator());
+        trayMenu.Items.Add("导出诊断日志(&L)...", null, (_, _) => ExportDiagnostics());
         trayMenu.Items.Add("退出(&X)", null, (_, _) => Close());
 
         _tray.ContextMenuStrip = trayMenu;
@@ -1549,6 +1551,63 @@ public sealed class MainForm : Form
             PrevPage();
         else
             NextPage();
+    }
+
+    // ---------------------------------------------------------------- 诊断日志
+
+    /// <summary>
+    /// 把环境快照与日志打包成 zip，方便用户附到 GitHub issue 里（所有路径已打码）。
+    /// 崩溃信息由 Program 里的兜底处理器写进 data\error.log，这里一并打包。
+    /// </summary>
+    private void ExportDiagnostics()
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "导出诊断日志",
+            Filter = "诊断包 (*.zip)|*.zip",
+            FileName = $"DReaderNext-诊断-{DateTime.Now:yyyyMMdd-HHmm}.zip",
+        };
+
+        // 有对话框时鼠标钩子要让路，否则对话框上的点击会被接管逻辑吞掉
+        _modalOpen = true;
+        try
+        {
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+                return;
+        }
+        finally
+        {
+            _modalOpen = false;
+        }
+
+        var lines = new List<string>
+        {
+            $"窗口尺寸(客户端): {ClientSize.Width}×{ClientSize.Height}",
+            $"DPI: {DeviceDpi}（缩放 {DpiScale:P0}）",
+            $"每页行数: {_rowsPerPage}   总行数: {_book?.LineCount ?? 0}   章节数: {_book?.Chapters.Count ?? 0}",
+            $"编码: {_book?.EncodingName ?? "-"}",
+            $"背景全透明: {_settings.TransparentBackground}   鼠标穿透: {_settings.ClickThrough}"
+                + $"（鼠标接管{(_mouseHook != IntPtr.Zero ? "已安装" : "未安装")}）",
+            $"热键注册失败数: {_hotkeyFailures}",
+            $"窗口置顶: {_settings.AlwaysOnTop}   透明度: {_settings.WindowOpacity:P0}"
+                + $"   字体: {_settings.FontName} {_settings.FontSize}pt",
+        };
+
+        try
+        {
+            IReadOnlyList<string> files = Diagnostics.Export(dlg.FileName, lines);
+            SetStatusTemp("已导出诊断日志");
+            MessageBox.Show(
+                $"已导出 {files.Count} 个文件：\n{dlg.FileName}\n\n" +
+                "所有文件路径都已打码（只保留盘符与扩展名），可以直接附到 GitHub issue 里。",
+                "DReader-Next", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            ErrorLog.Write("导出诊断日志失败", ex);
+            MessageBox.Show($"导出失败：{ex.Message}", "DReader-Next",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     // ---------------------------------------------------------------- 进度与状态

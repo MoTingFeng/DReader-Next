@@ -1,0 +1,10 @@
+# 关掉「空白 issue」，让反馈都走表单——表单里带版本、系统与诊断日志这几项，缺了没法排查
+blank_issues_enabled: false
+
+contact_links:
+  - name: 使用说明（README）
+    url: https://github.com/MoTingFeng/DReader-Next#readme
+    about: 操作方式、鼠标穿透开关、已知限制都写在这里
+  - name: 下载最新版
+    url: https://github.com/MoTingFeng/DReader-Next/releases/latest
+    about: 免安装，解压双击即可

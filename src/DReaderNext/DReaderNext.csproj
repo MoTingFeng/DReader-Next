@@ -13,7 +13,7 @@
     <AssemblyName>DReaderNext</AssemblyName>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <!-- 高 DPI：net48 没有 ApplicationHighDpiMode 源生成器，改由 manifest 声明 PerMonitorV2（对应验收项 9） -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 应用图标：嵌进 exe，资源管理器/任务栏/托盘共用（托盘与各窗体的 Icon 由 AppIcon 从 exe 反取） -->
@@ -26,5 +26,10 @@
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
     <FrameworkPathOverride Condition="'$(FrameworkPathOverride)' == '' and Exists('C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorlib.dll')">C:\Windows\Microsoft.NET\Framework64\v4.0.30319</FrameworkPathOverride>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 导出诊断日志要打 zip：net48 下 ZipArchive 在 System.IO.Compression（GAC 自带，不随发布复制） -->
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
 
 </Project>
