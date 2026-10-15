@@ -66,6 +66,14 @@ public sealed class AppSettings
     /// 指的是自己绘制的一条信息栏，不是系统标题栏；开了会多出一个原程序没有的头部。
     /// </summary>
     public bool ShowTitleBar { get; set; } = false;
+
+    /// <summary>
+    /// 鼠标穿透。勾选时，窗口的抠色（透明）像素会把鼠标让给后面的窗口——这是分层窗口的固有行为，
+    /// 这时只有按在文字笔画上才收得到事件，「按住拖动」基本失效。
+    /// 默认关闭：用低层鼠标钩子把窗口矩形内的鼠标接管过来（按住任意位置都能拖、点半区翻页、
+    /// 滚轮翻页、右键出菜单），代价是窗口矩形内点不到后面的窗口，想点后面先把窗口移开。
+    /// </summary>
+    public bool ClickThrough { get; set; } = false;
     public bool EdgeHide { get; set; } = false;
     public bool HideTrayIcon { get; set; } = false;
     public bool AutoOpenLast { get; set; } = true;

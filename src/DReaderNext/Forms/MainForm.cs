@@ -58,6 +58,7 @@ public sealed class MainForm : Form
     private int _autoPageSeconds = 30;
 
     private readonly ToolStripMenuItem _miTransparent = new("背景全透明(&B)");
+    private readonly ToolStripMenuItem _miClickThrough = new("鼠标穿透(&P)");
     private readonly ToolStripMenuItem _miTopMost = new("窗口置顶(&A)");
     private readonly ToolStripMenuItem _miSnapEdge = new("贴边隐藏(&E)");
     private readonly ToolStripMenuItem _miTitleBar = new("显示标题栏(&L)");
@@ -78,6 +79,15 @@ public sealed class MainForm : Form
     private Point _pressScreen;
     private Point _pressWindowLocation;
     private bool _dragging;
+
+    // 「鼠标穿透」关闭时用的低层鼠标钩子（把窗口矩形内的鼠标事件接管过来）
+    private NativeMethods.LowLevelMouseProc? _mouseHookProc;   // 必须留引用：被 GC 回收会直接崩
+    private IntPtr _mouseHook;
+    private bool _hookPressed;
+    private bool _hookDragging;
+    private Point _hookPressScreen;
+    private Point _hookPressWindowLocation;
+    private int _hookEventsLogged;
 
     // 隐藏（老板键或鼠标离开自动隐藏都用这一套状态）
     private bool _isHidden;
@@ -233,6 +243,14 @@ public sealed class MainForm : Form
         };
         _contextMenu.Items.Add(_miTransparent);
 
+        _miClickThrough.Click += (_, _) =>
+        {
+            _settings.ClickThrough = !_settings.ClickThrough;
+            UpdateMouseHook();
+            _settings.Save();
+        };
+        _contextMenu.Items.Add(_miClickThrough);
+
         _miTopMost.Click += (_, _) =>
         {
             _settings.AlwaysOnTop = !_settings.AlwaysOnTop;
@@ -318,6 +336,7 @@ public sealed class MainForm : Form
     private void SyncContextMenuChecks(ToolStripMenuItem autoHideDelay)
     {
         _miTransparent.Checked = _settings.TransparentBackground;
+        _miClickThrough.Checked = _settings.ClickThrough;
         _miTopMost.Checked = _settings.AlwaysOnTop;
         _miSnapEdge.Checked = _settings.SnapToEdge;
         _miAutoHide.Checked = _settings.AutoHideOnMouseLeave;
@@ -407,6 +426,7 @@ public sealed class MainForm : Form
         _statusBar.BackColor = transparent ? key : SystemColors.Control;
 
         ApplyReadingColors(key, transparent);
+        UpdateMouseHook();
     }
 
     /// <summary>
@@ -491,6 +511,7 @@ public sealed class MainForm : Form
     {
         SaveProgress();
         UnregisterHotkeys();
+        RemoveMouseHook();
 
         _autoHideTimer.Stop();
         _edgeTimer.Stop();
@@ -1356,6 +1377,169 @@ public sealed class MainForm : Form
             NextPage();
         else
             PrevPage();
+    }
+
+    // ---------------------------------------------------------------- 鼠标穿透开关（低层钩子）
+
+    /// <summary>
+    /// 「鼠标穿透」关闭时调用：装/卸 WH_MOUSE_LL 低层鼠标钩子。
+    ///
+    /// 为什么需要它：窗口用 TransparencyKey 做「背景全透明」，而 Windows 对分层窗口的抠色像素
+    /// 不仅视觉透明，**连鼠标一起穿透**——正文控件的底色正是那个抠色，于是按在文字之间的空白处，
+    /// 事件直接落到后面的窗口上，只有正好按在文字笔画上才算按到本窗口（实测窗口内 20 个采样点
+    /// 只有 5 个命中了正文控件）。直观后果就是「按住拖动」时灵时不灵。
+    /// 钩子把窗口矩形内的鼠标事件接管过来（吞掉、不再穿到后面），才能做到「按住任意位置都能拖」。
+    /// </summary>
+    private void UpdateMouseHook()
+    {
+        if (!_settings.ClickThrough && _mouseHook == IntPtr.Zero)
+        {
+            _mouseHookProc = OnLowLevelMouse;
+            _mouseHook = NativeMethods.SetWindowsHookEx(
+                NativeMethods.WH_MOUSE_LL, _mouseHookProc, NativeMethods.GetModuleHandle(null), 0);
+
+            if (_mouseHook == IntPtr.Zero)
+            {
+                // 装不上（例如被安全软件/沙箱拦住）：保留用户的开关选择，只把失败写进日志 + 状态栏提示，
+                // 绝不悄悄改设置——否则用户看到的勾选状态和实际行为会对不上。
+                _mouseHookProc = null;
+                LogMouseHook($"安装失败，Win32 错误码 {NativeMethods.LastError()}");
+                SetStatusTemp("鼠标接管失败，请查看 data\\mouse-hook.log");
+            }
+            else
+            {
+                _hookEventsLogged = 0;
+                LogMouseHook($"已安装 hHook={_mouseHook}");
+            }
+        }
+        else if (_settings.ClickThrough && _mouseHook != IntPtr.Zero)
+        {
+            RemoveMouseHook();
+            LogMouseHook("已卸载（切回穿透）");
+        }
+    }
+
+    /// <summary>鼠标接管状态的诊断日志（与 last-load.log 同类，只用于排查，不参与逻辑）。</summary>
+    private static void LogMouseHook(string line)
+    {
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(Storage.DataDir, "mouse-hook.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {line}{Environment.NewLine}");
+        }
+        catch (Exception)
+        {
+            // 日志写不进去不影响功能
+        }
+    }
+
+    private void RemoveMouseHook()
+    {
+        if (_mouseHook == IntPtr.Zero)
+            return;
+
+        NativeMethods.UnhookWindowsHookEx(_mouseHook);
+        _mouseHook = IntPtr.Zero;
+        _mouseHookProc = null;
+        _hookPressed = false;
+        _hookDragging = false;
+    }
+
+    private IntPtr OnLowLevelMouse(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode < 0)
+            return NativeMethods.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
+
+        try
+        {
+            NativeMethods.MouseHookData data = NativeMethods.ReadMouseHookData(lParam);
+
+            // 菜单/对话框开着时不能接管（弹出菜单可能压在窗口矩形上，吞掉就点不动菜单项了）；
+            // 隐藏中也一律放过去。注入的事件不做区分：程序自己从不注入鼠标事件，统一处理更可预期。
+            bool menuOrDialogOpen = _modalOpen
+                                    || _contextMenu.Visible
+                                    || _tray.ContextMenuStrip?.Visible == true;
+
+            if (_isHidden || !Visible || menuOrDialogOpen)
+                return NativeMethods.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
+
+            var at = new Point(data.Point.X, data.Point.Y);
+            if (!Bounds.Contains(at) && !_hookPressed)
+                return NativeMethods.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
+
+            // 只记前三条：够证明「钩子确实接到了窗口内的事件」，又不会把日志写爆
+            if (_hookEventsLogged < 3)
+            {
+                _hookEventsLogged++;
+                LogMouseHook($"接管事件 {_hookEventsLogged}: msg=0x{(int)wParam:X} @({at.X},{at.Y})");
+            }
+
+            switch ((int)wParam)
+            {
+                case NativeMethods.WM_LBUTTONDOWN:
+                    _hookPressed = true;
+                    _hookDragging = false;
+                    _hookPressScreen = at;
+                    _hookPressWindowLocation = Location;
+                    return (IntPtr)1;
+
+                case NativeMethods.WM_MOUSEMOVE:
+                    if (!_hookPressed)
+                        break;
+
+                    int dx = at.X - _hookPressScreen.X;
+                    int dy = at.Y - _hookPressScreen.Y;
+                    if (!_hookDragging && (Math.Abs(dx) > DragThreshold || Math.Abs(dy) > DragThreshold))
+                        _hookDragging = true;
+
+                    if (_hookDragging)
+                        Location = new Point(_hookPressWindowLocation.X + dx, _hookPressWindowLocation.Y + dy);
+                    return (IntPtr)1;
+
+                case NativeMethods.WM_LBUTTONUP:
+                    if (!_hookPressed)
+                        break;
+
+                    _hookPressed = false;
+                    if (_hookDragging)
+                    {
+                        _hookDragging = false;
+                        _settings.WindowX = Location.X;
+                        _settings.WindowY = Location.Y;
+                        _settings.Save();
+                    }
+                    else if (at.X - Bounds.Left < Bounds.Width / 2)
+                    {
+                        NextPage();   // 单击左半区：下翻页
+                    }
+                    else
+                    {
+                        PrevPage();   // 单击右半区：上翻页
+                    }
+                    return (IntPtr)1;
+
+                case NativeMethods.WM_RBUTTONDOWN:
+                    return (IntPtr)1;   // 与 UP 配对吞掉，否则后面的窗口会收到没有配对的按下
+
+                case NativeMethods.WM_RBUTTONUP:
+                    _contextMenu.Show(at);
+                    return (IntPtr)1;
+
+                case NativeMethods.WM_MOUSEWHEEL:
+                    if (NativeMethods.WheelDelta(data) > 0)
+                        PrevPage();
+                    else
+                        NextPage();
+                    return (IntPtr)1;
+            }
+        }
+        catch (Exception)
+        {
+            // 钩子回调里抛异常会直接把进程带走：吞掉，交给系统默认处理
+        }
+
+        return NativeMethods.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
     }
 
     private void OnTextMouseWheel(object? sender, MouseEventArgs e)
