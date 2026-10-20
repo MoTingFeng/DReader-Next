@@ -688,7 +688,7 @@ public sealed class MainForm : Form
     private void ShowAbout()
     {
         MessageBox.Show(
-            "DReader-Next 0.1.0\n\n" +
+            $"DReader-Next {Application.ProductVersion.Split('+')[0]}\n\n" +
             "原程序 DReader 7.3.0.0（易语言，作者 Dim，2022-03-18）的功能等效重写版。\n\n" +
             "已实现：\n" +
             "  打开 txt / epub、拖入文件、编码自动识别（UTF-8 / UTF-16 / GB18030）\n" +

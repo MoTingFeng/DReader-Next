@@ -13,7 +13,7 @@
     <AssemblyName>DReaderNext</AssemblyName>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <!-- 高 DPI：net48 没有 ApplicationHighDpiMode 源生成器，改由 manifest 声明 PerMonitorV2（对应验收项 9） -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 应用图标：嵌进 exe，资源管理器/任务栏/托盘共用（托盘与各窗体的 Icon 由 AppIcon 从 exe 反取） -->
