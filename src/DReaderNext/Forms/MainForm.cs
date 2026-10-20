@@ -691,7 +691,7 @@ public sealed class MainForm : Form
             "DReader-Next 0.1.0\n\n" +
             "原程序 DReader 7.3.0.0（易语言，作者 Dim，2022-03-18）的功能等效重写版。\n\n" +
             "已实现：\n" +
-            "  打开 txt、拖入文件、编码自动识别（UTF-8 / UTF-16 / GB18030）\n" +
+            "  打开 txt / epub、拖入文件、编码自动识别（UTF-8 / UTF-16 / GB18030）\n" +
             "  章节识别与目录跳转、分页阅读、阅读进度记忆\n" +
             "  背景全透明与透明度可调、无边框拖动、窗口置顶、贴边隐藏\n" +
             "  老板键与翻页全局热键、鼠标左右半区翻页、滚轮、托盘\n" +
@@ -897,7 +897,7 @@ public sealed class MainForm : Form
         using var dlg = new OpenFileDialog
         {
             Title = "请选择文件：",
-            Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
+            Filter = "电子书 (*.txt;*.epub)|*.txt;*.epub|文本文件 (*.txt)|*.txt|EPUB (*.epub)|*.epub|所有文件 (*.*)|*.*",
         };
 
         _modalOpen = true;
@@ -925,6 +925,13 @@ public sealed class MainForm : Form
             // 大文件的解码与章节扫描都在后台线程，避免界面卡死（原程序的主要毛病）
             Book book = await Task.Run(() =>
             {
+                // EPUB 不能按字节偏移 seek（正文在 zip 里的 XHTML），先转成纯文本缓存再走同一条链路
+                if (EpubConverter.IsEpub(path))
+                {
+                    EpubConverter.OpenResult epub = EpubConverter.Open(path, Storage.DataDir);
+                    return new Book(path, epub.Scan, epub.CachePath, epub.Title);
+                }
+
                 TextScanResult scan = TextLoader.Scan(path);
                 return new Book(path, scan);
             });
@@ -1647,7 +1654,7 @@ public sealed class MainForm : Form
         // 还没打开书时把提示也写进正文区：状态栏那一行在无边框窗口里太不起眼，
         // 用户打开后会以为程序根本没启动。
         if (_book is null && left.Length > 0)
-            _text.Text = $"{left}\r\n\r\n右键菜单 → 打开文件，或直接把 txt 文件拖进来。";
+            _text.Text = $"{left}\r\n\r\n右键菜单 → 打开文件，或直接把 txt / epub 文件拖进来。";
     }
 
     private async void SetStatusTemp(string message)

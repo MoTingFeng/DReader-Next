@@ -14,6 +14,10 @@ public sealed class Book
     private readonly long[] _lineOffsets;
     private readonly Encoding _encoding;
 
+    /// <summary>正文实际读取的文件。EPUB 是转出的缓存 txt；普通 txt 与自己相同。</summary>
+    private readonly string _readPath;
+
+    /// <summary>用户打开的那个文件（EPUB 是 .epub 本体），作为进度与书签的键。</summary>
     public string Path { get; }
     public string Title { get; }
     public string EncodingName { get; }
@@ -23,10 +27,15 @@ public sealed class Book
 
     public IReadOnlyList<Chapter> Chapters { get; }
 
-    public Book(string path, TextScanResult scan)
+    /// <param name="path">用户打开的文件，作为进度/书签的键。</param>
+    /// <param name="scan">行偏移表 + 章节表。</param>
+    /// <param name="readPath">正文读取源：EPUB 传转出的缓存 txt，普通 txt 不传。</param>
+    /// <param name="title">显示用书名：EPUB 用 OPF 里的 dc:title，普通 txt 用文件名。</param>
+    public Book(string path, TextScanResult scan, string? readPath = null, string? title = null)
     {
         Path = path;
-        Title = System.IO.Path.GetFileNameWithoutExtension(path);
+        _readPath = string.IsNullOrEmpty(readPath) ? path : readPath!;
+        Title = string.IsNullOrWhiteSpace(title) ? System.IO.Path.GetFileNameWithoutExtension(path) : title!;
         EncodingName = scan.EncodingName;
         _lineOffsets = scan.LineOffsets;
         _encoding = scan.Encoding;
@@ -82,7 +91,7 @@ public sealed class Book
             return string.Empty;
 
         var buffer = new byte[length];
-        using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var stream = new FileStream(_readPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         stream.Seek(from, SeekOrigin.Begin);
         stream.ReadExactly(buffer, 0, length);
 
